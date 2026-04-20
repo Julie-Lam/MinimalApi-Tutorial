@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using AutoMapper;
 using Microsoft.EntityFrameworkCore; 
 
 
@@ -5,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<MinimalApiDatabaseContext>(options => 
   options.UseInMemoryDatabase("MinimalApiDatabase")); 
 
-
+builder.Services.AddAutoMapper(typeof(MinimalApiMapper)); 
 var app = builder.Build();
 
 
@@ -24,36 +26,46 @@ app.MapGet("/courses", async (MinimalApiDatabaseContext db) =>
 
 }); 
 
-app.MapPost("courses", async (Course course, MinimalApiDatabaseContext db) =>
+app.MapPost("/courses", async (CourseDto courseDto, MinimalApiDatabaseContext db, IMapper mapper) =>
 {
-  db.Courses.Add(course); 
+
+  var newCourse = mapper.Map<Course>(courseDto); 
+
+  db.Courses.Add(newCourse); 
   await db.SaveChangesAsync(); 
 
-  return Results.Created(); 
-})
+
+  var courseResponse = mapper.Map<CourseDto>(newCourse); 
+
+
+  return Results.Created($"/courses/{courseResponse.CourseId}", courseResponse); 
+}); 
+
 app.Run();
 
 
-
-public class Course
+public class MinimalApiMapper : Profile
 {
-  public int CourseId { get; set; }
-  public string CourseName { get; set; } = string.Empty; 
-
-  public int CourseDuration { get; set; }
-
-  public int CourseType { get; set; }
+  public MinimalApiMapper()
+  {
+    CreateMap<Course, CourseDto>(); 
+    CreateMap<CourseDto, Course>(); 
+  }
 }
 
-public class MinimalApiDatabaseContext : DbContext
+public class CourseDto
 {
+    public int CourseId { get; set; }
+  public string CourseName { get; set; } = string.Empty; 
 
-  public DbSet<Course> Courses {get; set;}
-  public MinimalApiDatabaseContext(DbContextOptions options) : base(options)
-  {
-    
-
-  }
+[JsonConverter(typeof(JsonStringEnumConverter))]
+  public COURSE_TYPE CourseType { get; set; }
+}
 
 
+public enum COURSE_TYPE
+{
+  ENGINEERING = 1, 
+  MEDICAL = 2, 
+  MANAGEMENT = 3
 }
